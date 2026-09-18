@@ -1,0 +1,122 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all unmatched paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Conversation participant validation
+    function isConversationParticipant(convId) {
+      return isAuthenticated() && (
+        convId.matches('.*' + request.auth.uid + '.*') ||
+        (exists(/databases/$(database)/documents/conversations/$(convId)) &&
+         request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants)
+      );
+    }
+
+    // 1. Profiles catalog (Discovery feed)
+    // Authenticated users can read public dating profiles for discovery
+    match /profiles/{profileId} {
+      allow get: if isAuthenticated() && isValidId(profileId);
+      allow list: if isAuthenticated();
+
+      // Users can create their own profile or initial catalog profiles
+      allow create: if isAuthenticated() && isValidId(profileId)
+                    && (!('verified' in request.resource.data) || request.resource.data.verified == false)
+                    && (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus == 'none');
+
+      // Users can edit their own profile, but protected server-controlled fields cannot be modified
+      allow update: if isAuthenticated() && isValidId(profileId)
+                    && (request.auth.uid == profileId || resource.data.uid == request.auth.uid)
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                         'verified', 'isVerified', 'paymentStatus', 'verifiedAt',
+                         'verificationProvider', 'verificationPaymentId',
+                         'verificationAmount', 'verificationCurrency'
+                       ]);
+
+      allow delete: if false;
+    }
+
+    // 2. User accounts, verification status, and profile views
+    match /users/{userId} {
+      // Authenticated users can read their own account data (including verification status)
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false; // Deny querying or listing all user accounts
+
+      // Profile creation: client cannot set verified=true, paymentStatus='paid', or spoof counts
+      allow create: if isOwner(userId) && isValidId(userId)
+                    && (!('verified' in request.resource.data) || request.resource.data.verified == false)
+                    && (!('isVerified' in request.resource.data) || request.resource.data.isVerified == false)
+                    && (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus == 'none')
+                    && (!('uniqueProfilesViewedCount' in request.resource.data) || request.resource.data.uniqueProfilesViewedCount == 0)
+                    && !('verifiedAt' in request.resource.data)
+                    && !('verificationProvider' in request.resource.data)
+                    && !('verificationPaymentId' in request.resource.data)
+                    && !('verificationAmount' in request.resource.data)
+                    && !('verificationCurrency' in request.resource.data);
+
+      // Profile update: client cannot touch any verification or server-controlled fields
+      allow update: if isOwner(userId) && isValidId(userId)
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                         'verified', 'isVerified', 'verifiedAt', 'paymentStatus',
+                         'verificationProvider', 'verificationPaymentId',
+                         'verificationAmount', 'verificationCurrency',
+                         'uniqueProfilesViewedCount'
+                       ]);
+
+      allow delete: if false;
+
+      // Subcollection: profileViews (10-free-profile counter)
+      // Read: allowed for the owner (both single get and collection list queries)
+      // Write: strictly forbidden from clients (managed exclusively by server backend)
+      match /profileViews/{profileUid} {
+        allow get: if isOwner(userId) && isValidId(profileUid);
+        allow list: if isOwner(userId);
+        allow create, update, delete: if false;
+      }
+
+      // Subcollection: matches & sympathies
+      match /matches/{matchId} {
+        allow get: if isOwner(userId) && isValidId(matchId);
+        allow list: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidId(matchId);
+        allow delete: if isOwner(userId) && isValidId(matchId);
+      }
+    }
+
+    // 3. Conversations and Chat Messages
+    // Only conversation participants can access conversations and messages
+    match /conversations/{conversationId} {
+      allow get: if isConversationParticipant(conversationId) && isValidId(conversationId);
+      allow list: if false; // Deny broad listing of all conversations
+      allow create, update: if isConversationParticipant(conversationId) && isValidId(conversationId);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get: if isConversationParticipant(conversationId) && isValidId(messageId);
+        allow list: if isConversationParticipant(conversationId);
+        allow create: if isConversationParticipant(conversationId)
+                      && isValidId(messageId)
+                      && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if isConversationParticipant(conversationId)
+                              && isValidId(messageId)
+                              && resource.data.senderId == request.auth.uid;
+      }
+    }
+  }
+}

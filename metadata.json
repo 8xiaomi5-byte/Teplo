@@ -1,0 +1,6 @@
+{
+  "name": "Тепло — Сервис душевных знакомств",
+  "description": "Безопасные и искренние знакомства с психологической совместимостью, верификацией профилей и тёплыми свиданиями.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

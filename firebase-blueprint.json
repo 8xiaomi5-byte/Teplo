@@ -1,0 +1,115 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile in Teplo dating service including verification and payment details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "age": { "type": "number" },
+        "city": { "type": "string" },
+        "profession": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "verified": { "type": "boolean" },
+        "verifiedAt": { "type": "string" },
+        "paymentStatus": { "type": "string", "enum": ["none", "pending", "paid", "failed", "refunded"] },
+        "verificationProvider": { "type": "string" },
+        "verificationPaymentId": { "type": "string" },
+        "verificationAmount": { "type": "number" },
+        "verificationCurrency": { "type": "string" },
+        "uniqueProfilesViewedCount": { "type": "number" },
+        "isOnline": { "type": "boolean" },
+        "isEditorChoice": { "type": "boolean" },
+        "completionPercentage": { "type": "number" },
+        "avatarUrl": { "type": "string" },
+        "heroPhoto": { "type": "string" },
+        "compatibility": { "type": "number" },
+        "psychotype": { "type": "string" },
+        "compatibilityNote": { "type": "string" },
+        "valuesMatch": { "type": "number" },
+        "rhythmMatch": { "type": "number" },
+        "highlightQuote": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid"]
+    },
+    "ProfileViewRecord": {
+      "title": "ProfileViewRecord",
+      "description": "A unique dating profile viewed by the user",
+      "type": "object",
+      "properties": {
+        "profileUid": { "type": "string" },
+        "firstViewedAt": { "type": "string" }
+      },
+      "required": ["profileUid"]
+    },
+    "UserMatch": {
+      "title": "UserMatch",
+      "description": "A match or sympathy connection for a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "targetProfileId": { "type": "string" },
+        "targetProfileName": { "type": "string" },
+        "targetProfileAvatar": { "type": "string" },
+        "reaction": { "type": "string" },
+        "isMutual": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "targetProfileId"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Direct message or date proposal between users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "isVoice": { "type": "boolean" },
+        "voiceDuration": { "type": "string" },
+        "isDateProposal": { "type": "boolean" },
+        "dateVenue": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "address": { "type": "string" },
+            "time": { "type": "string" },
+            "category": { "type": "string" }
+          }
+        }
+      },
+      "required": ["senderId", "receiverId"]
+    }
+  },
+  "firestore": {
+    "/profiles/{profileId}": {
+      "schema": "UserProfile",
+      "description": "Public catalog of dating profiles for discovery"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User private profile and verification status document"
+    },
+    "/users/{userId}/profileViews/{profileUid}": {
+      "schema": "ProfileViewRecord",
+      "description": "Subcollection storing unique profiles viewed by this user"
+    },
+    "/users/{userId}/matches/{matchId}": {
+      "schema": "UserMatch",
+      "description": "User's matches and sent sympathies"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Messages exchanged in a chat between matched users"
+    }
+  }
+}
